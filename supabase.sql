@@ -23,6 +23,7 @@ create table if not exists public.cases (
   process_number text not null,
   case_name text not null,
   subject text not null,
+  access_key text,
   owner_id uuid not null references public.profiles(id),
   priority text not null default 'normal' check (priority in ('normal','high','urgent')),
   received_date date not null,
@@ -37,6 +38,9 @@ create table if not exists public.cases (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Compatibilidade com projetos que já executaram uma versão anterior do schema.
+alter table public.cases add column if not exists access_key text;
 
 create table if not exists public.case_files (
   id uuid primary key default gen_random_uuid(),
@@ -117,6 +121,13 @@ create policy "cases_update_active" on public.cases for update to authenticated
 using (exists(select 1 from public.profiles p where p.id=auth.uid() and p.active=true and p.role in ('admin','user')))
 with check (exists(select 1 from public.profiles p where p.id=auth.uid() and p.active=true and p.role in ('admin','user')));
 
+-- Exclusão definitiva de registros é restrita a administradores ativos.
+create policy "cases_delete_admin" on public.cases for delete to authenticated
+using (exists(select 1 from public.profiles p where p.id=auth.uid() and p.role='admin' and p.active=true));
+
+create policy "files_delete_admin" on public.case_files for delete to authenticated
+using (exists(select 1 from public.profiles p where p.id=auth.uid() and p.role='admin' and p.active=true));
+
 create policy "files_insert_active" on public.case_files for insert to authenticated
 with check (exists(select 1 from public.profiles p where p.id=auth.uid() and p.active=true and p.role in ('admin','user')));
 
@@ -133,6 +144,9 @@ on conflict (id) do update set public=false,file_size_limit=10485760;
 create policy "storage_read_authenticated" on storage.objects for select to authenticated using (bucket_id='case-files');
 create policy "storage_insert_active" on storage.objects for insert to authenticated with check (
   bucket_id='case-files' and exists(select 1 from public.profiles p where p.id=auth.uid() and p.active=true and p.role in ('admin','user'))
+);
+create policy "storage_delete_admin" on storage.objects for delete to authenticated using (
+  bucket_id='case-files' and exists(select 1 from public.profiles p where p.id=auth.uid() and p.role='admin' and p.active=true)
 );
 
 -- IMPORTANTE: depois de criar o primeiro usuário no Auth, torne-o administrador:

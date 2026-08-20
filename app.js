@@ -23,7 +23,7 @@ const demoProfiles = [
 const todayISO = () => new Date().toISOString().slice(0,10);
 function offsetDate(days){const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()+days);return d.toISOString().slice(0,10)}
 const demoCases = [
-  {id:'c1',process_number:'5012345-12.2026.8.24.0000',case_name:'Silva x Município',subject:'Contestação',owner_id:'u1',priority:'urgent',received_date:offsetDate(-10),deadline_date:offsetDate(0),deadline_mode:'business',deadline_days:8,status:'active',notes:'Revisar documentos antes do protocolo.',created_at:new Date().toISOString()},
+  {id:'c1',process_number:'5012345-12.2026.8.24.0000',case_name:'Silva x Município',subject:'Contestação',owner_id:'u1',priority:'urgent',received_date:offsetDate(-10),deadline_date:offsetDate(0),deadline_mode:'business',deadline_days:8,status:'active',notes:'Revisar documentos antes do protocolo.',access_key:'ABC123DEMO',created_at:new Date().toISOString()},
   {id:'c2',process_number:'0304582-44.2026.8.24.0000',case_name:'Empresa Aurora',subject:'Resposta a ofício',owner_id:'u2',priority:'high',received_date:offsetDate(-4),deadline_date:offsetDate(2),deadline_mode:'calendar',deadline_days:6,status:'active',notes:'',created_at:new Date().toISOString()},
   {id:'c3',process_number:'5009842-09.2026.8.24.0000',case_name:'Souza',subject:'Recurso administrativo',owner_id:'u3',priority:'normal',received_date:offsetDate(-3),deadline_date:offsetDate(6),deadline_mode:'business',deadline_days:7,status:'active',notes:'',created_at:new Date().toISOString()},
   {id:'c4',process_number:'5001123-55.2026.8.24.0000',case_name:'Almeida',subject:'Manifestação',owner_id:'u1',priority:'urgent',received_date:offsetDate(-15),deadline_date:offsetDate(-1),deadline_mode:'business',deadline_days:10,status:'active',notes:'Prazo vencido em demonstração.',created_at:new Date().toISOString()},
@@ -155,7 +155,7 @@ function renderDashboard(){
   const max=Math.max(1,...state.profiles.map(p=>active.filter(c=>c.owner_id===p.id).length));
   $('#teamLoad').innerHTML=state.profiles.map(p=>{const n=active.filter(c=>c.owner_id===p.id).length;return `<div class="team-row"><div class="avatar">${escapeHtml(p.full_name[0])}</div><div><strong>${escapeHtml(p.full_name)}</strong><div class="progress"><b style="width:${Math.round(n/max*100)}%"></b></div></div><strong>${n}</strong></div>`}).join('');
 }
-function matches(c,q){q=q.toLowerCase().trim();if(!q)return true;return [c.process_number,c.case_name,c.subject,ownerName(c.owner_id)].join(' ').toLowerCase().includes(q)}
+function matches(c,q){q=q.toLowerCase().trim();if(!q)return true;return [c.process_number,c.case_name,c.subject,c.access_key,c.notes,ownerName(c.owner_id)].join(' ').toLowerCase().includes(q)}
 function filterCases(base,filter){return base.filter(c=>{const d=daysDiff(c.deadline_date);if(filter==='late')return d<0;if(filter==='week')return d>=0&&d<=7;return true})}
 function tableHTML(rows,archive=false){
   if(!rows.length)return `<div class="empty-state">Nenhum registro encontrado.</div>`;
@@ -190,7 +190,7 @@ function updateDeadlinePreview(){
 
 async function saveCase(e){
   e.preventDefault();const deadline=updateDeadlinePreview();if(!deadline)return toast('Informe um prazo válido.');
-  const record={process_number:$('#processNumber').value.trim(),case_name:$('#caseName').value.trim(),subject:$('#subject').value.trim(),owner_id:$('#ownerId').value,priority:$('#priority').value,received_date:$('#receivedDate').value,deadline_date:deadline,deadline_mode:$('#deadlineMode').value,deadline_days:$('#deadlineMode').value==='manual'?null:Number($('#deadlineDays').value),status:'active',notes:$('#notes').value.trim()};
+  const record={process_number:$('#processNumber').value.trim(),case_name:$('#caseName').value.trim(),subject:$('#subject').value.trim(),access_key:$('#caseAccessKey').value.trim()||null,owner_id:$('#ownerId').value,priority:$('#priority').value,received_date:$('#receivedDate').value,deadline_date:deadline,deadline_mode:$('#deadlineMode').value,deadline_days:$('#deadlineMode').value==='manual'?null:Number($('#deadlineDays').value),status:'active',notes:$('#notes').value.trim()};
   let newCase;
   if(configured){
     const {data,error}=await sb.from('cases').insert(record).select().single();if(error)return toast('Não foi possível salvar: '+error.message);newCase=data;
@@ -200,7 +200,7 @@ async function saveCase(e){
       const up=await sb.storage.from('case-files').upload(path,file,{upsert:false});
       if(!up.error) await sb.from('case_files').insert({case_id:newCase.id,file_name:file.name,storage_path:path,size_bytes:file.size,mime_type:file.type,uploaded_by:state.user.id});
     }
-    if($('#casePassword').value) toast('Registro salvo. A credencial não foi enviada nesta versão por segurança. Veja o README.'); else toast('Registro salvo com sucesso.');
+    toast('Registro salvo com sucesso.');
     await loadRemote();
   } else {
     newCase={...record,id:'c'+Date.now(),created_at:new Date().toISOString()};state.cases.push(newCase);saveDemo();toast('Registro salvo no modo demonstrativo local.');
@@ -223,9 +223,77 @@ async function openCase(id){
   const c=state.cases.find(x=>x.id===id);if(!c)return;const ds=deadlineState(c);
   let files=[];if(configured){const r=await sb.from('case_files').select('*').eq('case_id',id).order('created_at');files=r.data||[];}
   $('#dialogCaseName').textContent=c.case_name;
-  $('#dialogBody').innerHTML=`<div class="dialog-content"><div class="detail-grid"><div class="detail"><span>PROCESSO</span><strong>${escapeHtml(c.process_number)}</strong></div><div class="detail"><span>ASSUNTO</span><strong>${escapeHtml(c.subject)}</strong></div><div class="detail"><span>RESPONSÁVEL</span><strong>${escapeHtml(ownerName(c.owner_id))}</strong></div><div class="detail"><span>STATUS</span><strong>${ds.label}</strong></div><div class="detail"><span>RECEBIMENTO</span><strong>${fmtDate(c.received_date)}</strong></div><div class="detail"><span>VENCIMENTO</span><strong>${fmtDate(c.deadline_date)}</strong></div></div>${c.notes?`<div class="history"><p class="eyebrow dark">OBSERVAÇÕES</p><div class="history-row">${escapeHtml(c.notes)}</div></div>`:''}${files.length?`<div class="history"><p class="eyebrow dark">DOCUMENTOS</p>${files.map(f=>`<div class="simple-row"><strong>${escapeHtml(f.file_name)}</strong><button class="action-link" data-download="${f.id}">Abrir</button></div>`).join('')}</div>`:''}<div class="dialog-actions"><button class="btn ghost" onclick="document.getElementById('caseDialog').close()">Fechar</button><button class="btn primary" data-${c.status==='done'?'reopen':'complete'}="${c.id}">${c.status==='done'?'Reabrir registro':'Concluir e arquivar'}</button></div></div>`;
+  const keyBlock=c.access_key?`<div class="detail detail-key"><span>CHAVE EPROC</span><div class="key-line"><strong>${escapeHtml(c.access_key)}</strong><button class="action-link" data-copy-key="${escapeHtml(c.access_key)}">Copiar</button></div></div>`:`<div class="detail"><span>CHAVE EPROC</span><strong>—</strong></div>`;
+  const notesBlock=`<div class="history"><p class="eyebrow dark">OBSERVAÇÕES</p><div class="history-row notes-display">${c.notes?escapeHtml(c.notes).replace(/\n/g,'<br>'):'Sem observações.'}</div></div>`;
+  const filesBlock=`<div class="history"><p class="eyebrow dark">DOCUMENTOS</p>${files.length?files.map(f=>`<div class="simple-row"><strong>${escapeHtml(f.file_name)}</strong><button class="action-link" data-download="${f.id}">Abrir</button></div>`).join(''):'<div class="history-row muted">Nenhum documento anexado.</div>'}</div>`;
+  const adminDelete=state.profile?.role==='admin'?`<button class="btn danger" data-delete-case="${c.id}">Excluir registro</button>`:'';
+  $('#dialogBody').innerHTML=`<div class="dialog-content"><div class="detail-grid"><div class="detail"><span>PROCESSO</span><strong>${escapeHtml(c.process_number)}</strong></div><div class="detail"><span>ASSUNTO</span><strong>${escapeHtml(c.subject)}</strong></div><div class="detail"><span>RESPONSÁVEL</span><strong>${escapeHtml(ownerName(c.owner_id))}</strong></div><div class="detail"><span>STATUS</span><strong>${ds.label}</strong></div><div class="detail"><span>RECEBIMENTO</span><strong>${fmtDate(c.received_date)}</strong></div><div class="detail"><span>VENCIMENTO</span><strong>${fmtDate(c.deadline_date)}</strong></div>${keyBlock}<div class="detail"><span>TIPO DE PRAZO</span><strong>${c.deadline_mode==='business'?'Dias úteis':c.deadline_mode==='calendar'?'Dias corridos':'Data manual'}${c.deadline_days!=null?` · ${c.deadline_days} dias`:''}</strong></div></div>${notesBlock}${filesBlock}<div class="dialog-actions split-actions"><div>${adminDelete}</div><div><button class="btn ghost" onclick="document.getElementById('caseDialog').close()">Fechar</button><button class="btn secondary" data-edit-case="${c.id}">Editar registro</button><button class="btn primary" data-${c.status==='done'?'reopen':'complete'}="${c.id}">${c.status==='done'?'Reabrir registro':'Concluir e arquivar'}</button></div></div></div>`;
   $('#caseDialog').showModal();
 }
+
+function editDeadlinePreview(){
+  const start=$('#editReceivedDate')?.value;const mode=$('#editDeadlineMode')?.value;const days=$('#editDeadlineDays')?.value;const manual=$('#editManualDeadline')?.value;
+  $('#editDaysField')?.classList.toggle('hidden',mode==='manual');$('#editManualField')?.classList.toggle('hidden',mode!=='manual');
+  const end=mode==='manual'?manual:(start?addDays(start,days,mode):'');
+  if($('#editDeadlinePreview')) $('#editDeadlinePreview').textContent=end?fmtLong(end):'—';
+  return end;
+}
+
+async function showEditCase(id){
+  const c=state.cases.find(x=>x.id===id);if(!c)return;
+  let files=[];if(configured){const r=await sb.from('case_files').select('*').eq('case_id',id).order('created_at');files=r.data||[];}
+  $('#dialogCaseName').textContent='Editar · '+c.case_name;
+  $('#dialogBody').innerHTML=`<form id="editCaseForm" class="dialog-content edit-form" data-case-id="${c.id}">
+    <div class="form-grid two">
+      <label><span>Número do processo *</span><input id="editProcessNumber" required value="${escapeHtml(c.process_number)}"></label>
+      <label><span>Nome do caso *</span><input id="editCaseName" required value="${escapeHtml(c.case_name)}"></label>
+      <label class="full"><span>Origem + Assunto *</span><input id="editSubject" required value="${escapeHtml(c.subject)}"></label>
+      <label><span>Responsável *</span><select id="editOwnerId">${state.profiles.map(p=>`<option value="${p.id}" ${p.id===c.owner_id?'selected':''}>${escapeHtml(p.full_name)}</option>`).join('')}</select></label>
+      <label><span>Prioridade</span><select id="editPriority"><option value="normal" ${c.priority==='normal'?'selected':''}>Normal</option><option value="high" ${c.priority==='high'?'selected':''}>Alta</option><option value="urgent" ${c.priority==='urgent'?'selected':''}>Urgente</option></select></label>
+      <label class="full"><span>Chave do processo / Chave eproc</span><input id="editAccessKey" value="${escapeHtml(c.access_key||'')}" placeholder="Opcional"></label>
+      <label><span>Data de recebimento *</span><input id="editReceivedDate" type="date" required value="${c.received_date}"></label>
+      <label><span>Modo do prazo</span><select id="editDeadlineMode"><option value="business" ${c.deadline_mode==='business'?'selected':''}>Dias úteis</option><option value="calendar" ${c.deadline_mode==='calendar'?'selected':''}>Dias corridos</option><option value="manual" ${c.deadline_mode==='manual'?'selected':''}>Data manual</option></select></label>
+      <label id="editDaysField"><span>Quantidade de dias *</span><input id="editDeadlineDays" type="number" min="0" value="${c.deadline_days??15}"></label>
+      <label id="editManualField" class="${c.deadline_mode==='manual'?'':'hidden'}"><span>Data final *</span><input id="editManualDeadline" type="date" value="${c.deadline_mode==='manual'?c.deadline_date:''}"></label>
+      <div class="deadline-preview full"><span>VENCIMENTO</span><strong id="editDeadlinePreview">${fmtLong(c.deadline_date)}</strong></div>
+      <label class="full"><span>Observações</span><textarea id="editNotes" rows="5">${escapeHtml(c.notes||'')}</textarea></label>
+    </div>
+    <div class="history"><p class="eyebrow dark">DOCUMENTOS JÁ ANEXADOS</p>${files.length?files.map(f=>`<div class="simple-row"><strong>${escapeHtml(f.file_name)}</strong><button type="button" class="action-link" data-download="${f.id}">Abrir</button></div>`).join(''):'<div class="history-row muted">Nenhum documento anexado.</div>'}</div>
+    <label class="upload-zone compact-upload" for="editFilesInput"><input id="editFilesInput" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"><span class="upload-icon">⇧</span><strong>Adicionar novos documentos</strong><small>Os anexos existentes serão preservados.</small></label>
+    <div id="editFileList" class="file-list"></div>
+    <div class="dialog-actions"><button type="button" class="btn ghost" data-cancel-edit="${c.id}">Cancelar</button><button class="btn primary" type="submit">Salvar alterações</button></div>
+  </form>`;
+  ['editReceivedDate','editDeadlineMode','editDeadlineDays','editManualDeadline'].forEach(x=>$('#'+x)?.addEventListener('input',editDeadlinePreview));
+  $('#editFilesInput')?.addEventListener('change',e=>{$('#editFileList').innerHTML=[...e.target.files].map(f=>`<div class="file-chip"><span>${escapeHtml(f.name)}</span><span>${(f.size/1024/1024).toFixed(2)} MB</span></div>`).join('')});
+  $('#editCaseForm').addEventListener('submit',saveEditedCase);
+  editDeadlinePreview();
+}
+
+async function saveEditedCase(e){
+  e.preventDefault();const id=e.currentTarget.dataset.caseId;const c=state.cases.find(x=>x.id===id);if(!c)return;
+  const deadline=editDeadlinePreview();if(!deadline)return toast('Informe um prazo válido.');
+  const patch={process_number:$('#editProcessNumber').value.trim(),case_name:$('#editCaseName').value.trim(),subject:$('#editSubject').value.trim(),access_key:$('#editAccessKey').value.trim()||null,owner_id:$('#editOwnerId').value,priority:$('#editPriority').value,received_date:$('#editReceivedDate').value,deadline_date:deadline,deadline_mode:$('#editDeadlineMode').value,deadline_days:$('#editDeadlineMode').value==='manual'?null:Number($('#editDeadlineDays').value),notes:$('#editNotes').value.trim()};
+  if(configured){
+    const {error}=await sb.from('cases').update(patch).eq('id',id);if(error)return toast('Não foi possível editar: '+error.message);
+    const files=[...($('#editFilesInput')?.files||[])];
+    for(const file of files){const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');const path=`${id}/${crypto.randomUUID()}-${safeName}`;const up=await sb.storage.from('case-files').upload(path,file,{upsert:false});if(!up.error)await sb.from('case_files').insert({case_id:id,file_name:file.name,storage_path:path,size_bytes:file.size,mime_type:file.type,uploaded_by:state.user.id});}
+    await loadRemote();
+  }else{Object.assign(c,patch);saveDemo();}
+  renderAll();toast('Alterações salvas.');await openCase(id);
+}
+
+async function deleteCase(id){
+  if(state.profile?.role!=='admin')return toast('Somente administradores podem excluir registros.');
+  const c=state.cases.find(x=>x.id===id);if(!c)return;
+  if(!confirm(`Excluir definitivamente o registro "${c.case_name}"? Esta ação não pode ser desfeita.`))return;
+  if(configured){
+    const fr=await sb.from('case_files').select('storage_path').eq('case_id',id);const paths=(fr.data||[]).map(f=>f.storage_path).filter(Boolean);
+    if(paths.length){const rm=await sb.storage.from('case-files').remove(paths);if(rm.error)return toast('Não foi possível excluir os anexos: '+rm.error.message);}
+    const {error}=await sb.from('cases').delete().eq('id',id);if(error)return toast('Não foi possível excluir: '+error.message);await loadRemote();
+  }else{state.cases=state.cases.filter(x=>x.id!==id);saveDemo();}
+  $('#caseDialog').close();renderAll();toast('Registro excluído.');
+}
+
 async function downloadFile(fileId){
   if(!configured)return;
   const {data:f}=await sb.from('case_files').select('*').eq('id',fileId).single();if(!f)return;
@@ -247,13 +315,16 @@ function bindEvents(){
   $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();const email=$('#loginEmail').value,password=$('#loginPassword').value;if(configured){const {data,error}=await sb.auth.signInWithPassword({email,password});if(error)return toast('Acesso negado: '+error.message);state.user=data.user;await enterApp();}else{loadDemo();await enterApp();toast('Modo demonstrativo: dados ficam somente neste navegador.')}});
   $('#logoutBtn').addEventListener('click',async()=>{if(configured)await sb.auth.signOut();state.user=null;state.profile=null;showAuth()});
   $('#toggleLoginPassword').addEventListener('click',()=>{const i=$('#loginPassword');i.type=i.type==='password'?'text':'password'});
-  $('#toggleCasePassword').addEventListener('click',()=>{const i=$('#casePassword');i.type=i.type==='password'?'text':'password'});
   document.addEventListener('click',e=>{
     const nav=e.target.closest('[data-view]');if(nav)switchView(nav.dataset.view);
     const go=e.target.closest('[data-go]');if(go)switchView(go.dataset.go);
     const open=e.target.closest('[data-open]');if(open)openCase(open.dataset.open);
     const comp=e.target.closest('[data-complete]');if(comp)completeCase(comp.dataset.complete);
     const reopen=e.target.closest('[data-reopen]');if(reopen)reopenCase(reopen.dataset.reopen);
+    const edit=e.target.closest('[data-edit-case]');if(edit)showEditCase(edit.dataset.editCase);
+    const cancelEdit=e.target.closest('[data-cancel-edit]');if(cancelEdit)openCase(cancelEdit.dataset.cancelEdit);
+    const del=e.target.closest('[data-delete-case]');if(del)deleteCase(del.dataset.deleteCase);
+    const copy=e.target.closest('[data-copy-key]');if(copy){navigator.clipboard?.writeText(copy.dataset.copyKey);toast('Chave copiada.');}
     const dl=e.target.closest('[data-download]');if(dl)downloadFile(dl.dataset.download);
     const rh=e.target.closest('[data-remove-holiday]');if(rh)removeHoliday(rh.dataset.removeHoliday);
     const seg=e.target.closest('.segment');if(seg){const view=seg.closest('.view');view.querySelectorAll('.segment').forEach(x=>x.classList.remove('active'));seg.classList.add('active');const target=view.id.includes('my')?'my':'all';state.filters[target]=seg.dataset.filter;renderTables();}
