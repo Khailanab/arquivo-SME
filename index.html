@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Arquivo & Prazos</title>
+  <meta name="description" content="Sistema interno para controle de prazos e arquivo documental." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <section id="authScreen" class="auth-screen">
+    <div class="auth-shell">
+      <div class="auth-brand-panel">
+        <div>
+          <div class="brand-mark large">A</div>
+          <p class="eyebrow">SISTEMA INTERNO</p>
+          <h1>Arquivo<br>& Prazos</h1>
+          <p class="auth-copy">Controle coletivo de demandas, documentos e vencimentos em um só lugar.</p>
+        </div>
+        <div class="auth-security">
+          <span class="security-dot"></span>
+          Acesso restrito · Sessão autenticada
+        </div>
+      </div>
+
+      <div class="auth-form-panel">
+        <div class="auth-form-wrap">
+          <p class="eyebrow dark">ACESSO AO SISTEMA</p>
+          <h2>Entrar</h2>
+          <p class="muted">Use o e-mail institucional cadastrado pelo administrador.</p>
+
+          <form id="loginForm" class="form-stack">
+            <label>
+              <span>E-mail</span>
+              <input id="loginEmail" type="email" autocomplete="username" placeholder="nome@setor.gov.br" required />
+            </label>
+            <label>
+              <span>Senha</span>
+              <div class="password-field">
+                <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Sua senha" required />
+                <button id="toggleLoginPassword" type="button" class="icon-btn" aria-label="Mostrar senha">👁</button>
+              </div>
+            </label>
+            <button class="btn primary full" type="submit">Acessar sistema</button>
+          </form>
+
+          <div class="demo-note">
+            <strong>Primeiro acesso:</strong> configure o Supabase seguindo o README. Sem configuração, o app abre em modo demonstrativo local.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="brand-mark">A</div>
+        <div>
+          <strong>Arquivo & Prazos</strong>
+          <small>Gestão Interna</small>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-view="dashboard"><span>⌂</span> Visão Geral</button>
+        <button class="nav-item" data-view="myDeadlines"><span>◷</span> Meus Prazos <b id="myBadge" class="badge">0</b></button>
+        <button class="nav-item" data-view="allDeadlines"><span>▦</span> Todos os Prazos</button>
+        <button class="nav-item" data-view="newCase"><span>＋</span> Novo Registro</button>
+        <button class="nav-item" data-view="archive"><span>▣</span> Arquivo</button>
+        <button class="nav-item admin-only" data-view="admin"><span>⚙</span> Administração</button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="user-card">
+          <div id="userAvatar" class="avatar">U</div>
+          <div class="user-meta">
+            <strong id="userName">Usuário</strong>
+            <small id="userRole">Servidor</small>
+          </div>
+          <button id="logoutBtn" class="icon-btn light" title="Sair">↪</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="mobileMenu" class="mobile-menu">☰</button>
+        <div>
+          <p id="sectionEyebrow" class="eyebrow dark">PAINEL</p>
+          <h2 id="sectionTitle">Visão Geral</h2>
+        </div>
+        <div class="topbar-actions">
+          <div class="search-box desktop-search">
+            <span>⌕</span>
+            <input id="globalSearch" type="search" placeholder="Buscar processo, caso ou assunto..." />
+          </div>
+          <button class="btn primary" data-go="newCase">＋ Novo registro</button>
+        </div>
+      </header>
+
+      <section id="view-dashboard" class="view active">
+        <div class="hero-card">
+          <div>
+            <p class="eyebrow light">RESUMO OPERACIONAL</p>
+            <h3 id="greeting">Boa tarde.</h3>
+            <p>Veja os vencimentos do setor e priorize o que exige atenção hoje.</p>
+          </div>
+          <div class="hero-date">
+            <span id="todayWeekday">Quinta-feira</span>
+            <strong id="todayDate">20 AGO 2026</strong>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <article class="stat-card danger"><span>ATRASADOS</span><strong id="statLate">0</strong><small>requerem atenção imediata</small></article>
+          <article class="stat-card warning"><span>VENCEM HOJE</span><strong id="statToday">0</strong><small>prazos com vencimento hoje</small></article>
+          <article class="stat-card"><span>PRÓXIMOS 7 DIAS</span><strong id="statWeek">0</strong><small>prazos se aproximando</small></article>
+          <article class="stat-card success"><span>CONCLUÍDOS</span><strong id="statDone">0</strong><small>registros arquivados</small></article>
+        </div>
+
+        <div class="content-grid">
+          <section class="panel span-2">
+            <div class="panel-head">
+              <div><p class="eyebrow dark">PRIORIDADES</p><h3>Próximos vencimentos</h3></div>
+              <button class="text-btn" data-go="allDeadlines">Ver todos →</button>
+            </div>
+            <div id="priorityList" class="deadline-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><div><p class="eyebrow dark">EQUIPE</p><h3>Carga atual</h3></div></div>
+            <div id="teamLoad" class="team-load"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="view-myDeadlines" class="view">
+        <div class="toolbar">
+          <div class="segmented">
+            <button class="segment active" data-filter="active">Ativos</button>
+            <button class="segment" data-filter="late">Atrasados</button>
+            <button class="segment" data-filter="week">7 dias</button>
+          </div>
+          <div class="search-box"><span>⌕</span><input class="table-search" data-target="my" type="search" placeholder="Filtrar registros..." /></div>
+        </div>
+        <div class="table-card"><div id="myTable"></div></div>
+      </section>
+
+      <section id="view-allDeadlines" class="view">
+        <div class="toolbar">
+          <div class="segmented">
+            <button class="segment active" data-filter="active">Ativos</button>
+            <button class="segment" data-filter="late">Atrasados</button>
+            <button class="segment" data-filter="week">7 dias</button>
+          </div>
+          <div class="search-box"><span>⌕</span><input class="table-search" data-target="all" type="search" placeholder="Filtrar registros..." /></div>
+        </div>
+        <div class="table-card"><div id="allTable"></div></div>
+      </section>
+
+      <section id="view-newCase" class="view">
+        <form id="caseForm" class="record-layout">
+          <section class="panel form-panel">
+            <div class="panel-head"><div><p class="eyebrow dark">IDENTIFICAÇÃO</p><h3>Novo registro</h3></div><span class="form-step">01</span></div>
+            <div class="form-grid two">
+              <label><span>Número do processo *</span><input id="processNumber" required placeholder="Ex.: 5012345-12.2026.8.24.0000" /></label>
+              <label><span>Nome do caso *</span><input id="caseName" required placeholder="Ex.: Silva x Município" /></label>
+              <label class="full"><span>Assunto *</span><input id="subject" required placeholder="Ex.: Contestação / Ofício / Recurso" /></label>
+              <label><span>Responsável *</span><select id="ownerId" required></select></label>
+              <label><span>Prioridade</span><select id="priority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label>
+              <label class="full"><span>Senha / acesso do processo</span><div class="password-field"><input id="casePassword" type="password" placeholder="Opcional" /><button id="toggleCasePassword" type="button" class="icon-btn">👁</button></div><small class="field-note">Dado sensível. Veja a nota de segurança no README.</small></label>
+            </div>
+          </section>
+
+          <section class="panel form-panel">
+            <div class="panel-head"><div><p class="eyebrow dark">PRAZO</p><h3>Recebimento e vencimento</h3></div><span class="form-step">02</span></div>
+            <div class="form-grid two">
+              <label><span>Data de recebimento *</span><input id="receivedDate" type="date" required /></label>
+              <label><span>Modo do prazo</span><select id="deadlineMode"><option value="business">Dias úteis</option><option value="calendar">Dias corridos</option><option value="manual">Data manual</option></select></label>
+              <label id="daysField"><span>Quantidade de dias *</span><input id="deadlineDays" type="number" min="0" value="15" /></label>
+              <label id="manualField" class="hidden"><span>Data final *</span><input id="manualDeadline" type="date" /></label>
+              <div class="deadline-preview full"><span>VENCIMENTO CALCULADO</span><strong id="deadlinePreview">—</strong><small id="deadlineExplanation">Informe a data de recebimento e o prazo.</small></div>
+            </div>
+          </section>
+
+          <section class="panel form-panel">
+            <div class="panel-head"><div><p class="eyebrow dark">DOCUMENTOS</p><h3>Anexos e observações</h3></div><span class="form-step">03</span></div>
+            <label class="upload-zone" for="filesInput"><input id="filesInput" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" /><span class="upload-icon">⇧</span><strong>Adicionar documentos</strong><small>PDF, Word, Excel ou imagem · múltiplos arquivos</small></label>
+            <div id="fileList" class="file-list"></div>
+            <label class="full textarea-label"><span>Observações</span><textarea id="notes" rows="5" placeholder="Informações internas, orientações, histórico inicial..."></textarea></label>
+          </section>
+
+          <div class="form-actions">
+            <button class="btn ghost" type="reset">Limpar</button>
+            <button class="btn primary large" type="submit">Salvar registro</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="view-archive" class="view">
+        <div class="toolbar">
+          <div><p class="muted">Registros concluídos permanecem pesquisáveis e preservam o histórico.</p></div>
+          <div class="search-box"><span>⌕</span><input class="table-search" data-target="archive" type="search" placeholder="Pesquisar no arquivo..." /></div>
+        </div>
+        <div class="table-card"><div id="archiveTable"></div></div>
+      </section>
+
+      <section id="view-admin" class="view">
+        <div class="admin-grid">
+          <section class="panel">
+            <div class="panel-head"><div><p class="eyebrow dark">FERIADOS</p><h3>Calendário de dias não úteis</h3></div></div>
+            <form id="holidayForm" class="inline-form"><input id="holidayDate" type="date" required><input id="holidayName" placeholder="Nome do feriado/suspensão" required><button class="btn primary" type="submit">Adicionar</button></form>
+            <div id="holidayList" class="simple-list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><div><p class="eyebrow dark">USUÁRIOS</p><h3>Equipe cadastrada</h3></div></div>
+            <p class="muted compact">A criação de contas é feita com segurança no painel do Supabase Auth. Aqui você gerencia o perfil operacional.</p>
+            <div id="userList" class="simple-list"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="caseDialog" class="dialog">
+    <div class="dialog-head"><div><p class="eyebrow dark">REGISTRO</p><h3 id="dialogCaseName">Caso</h3></div><button id="closeDialog" class="icon-btn">✕</button></div>
+    <div id="dialogBody"></div>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
