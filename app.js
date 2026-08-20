@@ -1,7 +1,14 @@
 /* Arquivo & Prazos — frontend estático com Supabase + fallback demonstrativo local */
 const CFG = window.APP_CONFIG || {};
 const configured = CFG.SUPABASE_URL && !CFG.SUPABASE_URL.includes('SEU-PROJETO') && CFG.SUPABASE_ANON_KEY && !CFG.SUPABASE_ANON_KEY.includes('SUA-CHAVE');
-const sb = configured ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
+const sb = configured ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage
+  }
+}) : null;
 
 const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
@@ -43,15 +50,50 @@ function addDays(start, amount, mode){
 }
 
 async function init(){
-  bindEvents(); setToday();
-  if(configured){
-    const {data:{session}}=await sb.auth.getSession();
-    if(session){state.user=session.user;await enterApp();}else showAuth();
-    sb.auth.onAuthStateChange(async(_event,session)=>{if(session&&!state.user){state.user=session.user;await enterApp()}if(!session)showAuth()});
-  } else {
+  bindEvents();
+  setToday();
+
+  if(!configured){
     // Demo: login screen is real-looking, any email/password enters local demo.
     showAuth();
+    return;
   }
+
+  // Não decide a tela antes de o Supabase restaurar a sessão persistida.
+  const { data, error } = await sb.auth.getSession();
+  if(error){
+    console.error('Erro ao restaurar sessão:', error);
+    state.user = null;
+    state.profile = null;
+    showAuth();
+    return;
+  }
+
+  const session = data?.session || null;
+  if(session?.user){
+    state.user = session.user;
+    await enterApp();
+  } else {
+    showAuth();
+  }
+
+  // Mantém a interface sincronizada com login, refresh de token e logout.
+  sb.auth.onAuthStateChange(async (event, nextSession) => {
+    if(nextSession?.user){
+      const userChanged = state.user?.id !== nextSession.user.id;
+      state.user = nextSession.user;
+      if(userChanged || $('#app').classList.contains('hidden')){
+        await enterApp();
+      }
+      return;
+    }
+
+    if(event === 'SIGNED_OUT'){
+      state.user = null;
+      state.profile = null;
+      showAuth();
+    }
+  });
 }
 
 function showAuth(){$('#authScreen').classList.remove('hidden');$('#app').classList.add('hidden')}
