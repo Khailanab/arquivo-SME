@@ -27,7 +27,7 @@ const demoCases = [
   {id:'c2',process_number:'0304582-44.2026.8.24.0000',case_name:'Empresa Aurora',subject:'Resposta a ofício',owner_id:'u2',priority:'high',received_date:offsetDate(-4),deadline_date:offsetDate(2),deadline_mode:'calendar',deadline_days:6,status:'active',notes:'',created_at:new Date().toISOString()},
   {id:'c3',process_number:'5009842-09.2026.8.24.0000',case_name:'Souza',subject:'Recurso administrativo',owner_id:'u3',priority:'normal',received_date:offsetDate(-3),deadline_date:offsetDate(6),deadline_mode:'business',deadline_days:7,status:'active',notes:'',created_at:new Date().toISOString()},
   {id:'c4',process_number:'5001123-55.2026.8.24.0000',case_name:'Almeida',subject:'Manifestação',owner_id:'u1',priority:'urgent',received_date:offsetDate(-15),deadline_date:offsetDate(-1),deadline_mode:'business',deadline_days:10,status:'active',notes:'Prazo vencido em demonstração.',created_at:new Date().toISOString()},
-  {id:'c5',process_number:'0201234-88.2026.8.24.0000',case_name:'Pereira',subject:'Informação técnica',owner_id:'u4',priority:'normal',received_date:offsetDate(-12),deadline_date:offsetDate(-2),deadline_mode:'calendar',deadline_days:10,status:'done',completed_at:offsetDate(-2),notes:'',created_at:new Date().toISOString()}
+  {id:'c5',process_number:'0201234-88.2026.8.24.0000',case_name:'Pereira',subject:'Informação técnica',office_number:'Ofício 142/2026-MP',office_date:offsetDate(-13),owner_id:'u4',priority:'normal',received_date:offsetDate(-12),deadline_date:offsetDate(-2),deadline_mode:'calendar',deadline_days:10,status:'done',completed_at:offsetDate(-2),notes:'',created_at:new Date().toISOString()}
 ];
 const demoHolidays = [
   {id:'h1',date:'2026-09-07',name:'Independência do Brasil'},
@@ -155,7 +155,7 @@ function renderDashboard(){
   const max=Math.max(1,...state.profiles.map(p=>active.filter(c=>c.owner_id===p.id).length));
   $('#teamLoad').innerHTML=state.profiles.map(p=>{const n=active.filter(c=>c.owner_id===p.id).length;return `<div class="team-row"><div class="avatar">${escapeHtml(p.full_name[0])}</div><div><strong>${escapeHtml(p.full_name)}</strong><div class="progress"><b style="width:${Math.round(n/max*100)}%"></b></div></div><strong>${n}</strong></div>`}).join('');
 }
-function matches(c,q){q=q.toLowerCase().trim();if(!q)return true;return [c.process_number,c.case_name,c.subject,c.access_key,c.notes,ownerName(c.owner_id)].join(' ').toLowerCase().includes(q)}
+function matches(c,q){q=q.toLowerCase().trim();if(!q)return true;return [c.process_number,c.case_name,c.subject,c.office_number,c.office_date,c.access_key,c.notes,ownerName(c.owner_id)].join(' ').toLowerCase().includes(q)}
 function filterCases(base,filter){return base.filter(c=>{const d=daysDiff(c.deadline_date);if(filter==='late')return d<0;if(filter==='week')return d>=0&&d<=7;return true})}
 function tableHTML(rows,archive=false){
   if(!rows.length)return `<div class="empty-state">Nenhum registro encontrado.</div>`;
@@ -190,7 +190,7 @@ function updateDeadlinePreview(){
 
 async function saveCase(e){
   e.preventDefault();const deadline=updateDeadlinePreview();if(!deadline)return toast('Informe um prazo válido.');
-  const record={process_number:$('#processNumber').value.trim(),case_name:$('#caseName').value.trim(),subject:$('#subject').value.trim(),access_key:$('#caseAccessKey').value.trim()||null,owner_id:$('#ownerId').value,priority:$('#priority').value,received_date:$('#receivedDate').value,deadline_date:deadline,deadline_mode:$('#deadlineMode').value,deadline_days:$('#deadlineMode').value==='manual'?null:Number($('#deadlineDays').value),status:'active',notes:$('#notes').value.trim()};
+  const record={process_number:$('#processNumber').value.trim(),case_name:$('#caseName').value.trim(),subject:$('#subject').value.trim(),access_key:$('#caseAccessKey').value.trim()||null,office_number:$('#officeNumber').value.trim()||null,office_date:$('#officeDate').value||null,owner_id:$('#ownerId').value,priority:$('#priority').value,received_date:$('#receivedDate').value,deadline_date:deadline,deadline_mode:$('#deadlineMode').value,deadline_days:$('#deadlineMode').value==='manual'?null:Number($('#deadlineDays').value),status:'active',notes:$('#notes').value.trim()};
   let newCase;
   if(configured){
     const {data,error}=await sb.from('cases').insert(record).select().single();if(error)return toast('Não foi possível salvar: '+error.message);newCase=data;
@@ -227,7 +227,7 @@ async function openCase(id){
   const notesBlock=`<div class="history"><p class="eyebrow dark">OBSERVAÇÕES</p><div class="history-row notes-display">${c.notes?escapeHtml(c.notes).replace(/\n/g,'<br>'):'Sem observações.'}</div></div>`;
   const filesBlock=`<div class="history"><p class="eyebrow dark">DOCUMENTOS</p>${files.length?files.map(f=>`<div class="simple-row"><strong>${escapeHtml(f.file_name)}</strong><button class="action-link" data-download="${f.id}">Abrir</button></div>`).join(''):'<div class="history-row muted">Nenhum documento anexado.</div>'}</div>`;
   const adminDelete=state.profile?.role==='admin'?`<button class="btn danger" data-delete-case="${c.id}">Excluir registro</button>`:'';
-  $('#dialogBody').innerHTML=`<div class="dialog-content"><div class="detail-grid"><div class="detail"><span>PROCESSO</span><strong>${escapeHtml(c.process_number)}</strong></div><div class="detail"><span>ASSUNTO</span><strong>${escapeHtml(c.subject)}</strong></div><div class="detail"><span>RESPONSÁVEL</span><strong>${escapeHtml(ownerName(c.owner_id))}</strong></div><div class="detail"><span>STATUS</span><strong>${ds.label}</strong></div><div class="detail"><span>RECEBIMENTO</span><strong>${fmtDate(c.received_date)}</strong></div><div class="detail"><span>VENCIMENTO</span><strong>${fmtDate(c.deadline_date)}</strong></div>${keyBlock}<div class="detail"><span>TIPO DE PRAZO</span><strong>${c.deadline_mode==='business'?'Dias úteis':c.deadline_mode==='calendar'?'Dias corridos':'Data manual'}${c.deadline_days!=null?` · ${c.deadline_days} dias`:''}</strong></div></div>${notesBlock}${filesBlock}<div class="dialog-actions split-actions"><div>${adminDelete}</div><div><button class="btn ghost" onclick="document.getElementById('caseDialog').close()">Fechar</button><button class="btn secondary" data-edit-case="${c.id}">Editar registro</button><button class="btn primary" data-${c.status==='done'?'reopen':'complete'}="${c.id}">${c.status==='done'?'Reabrir registro':'Concluir e arquivar'}</button></div></div></div>`;
+  $('#dialogBody').innerHTML=`<div class="dialog-content"><div class="detail-grid"><div class="detail"><span>PROCESSO</span><strong>${escapeHtml(c.process_number)}</strong></div><div class="detail"><span>ASSUNTO</span><strong>${escapeHtml(c.subject)}</strong></div><div class="detail"><span>RESPONSÁVEL</span><strong>${escapeHtml(ownerName(c.owner_id))}</strong></div><div class="detail"><span>STATUS</span><strong>${ds.label}</strong></div><div class="detail"><span>RECEBIMENTO</span><strong>${fmtDate(c.received_date)}</strong></div><div class="detail"><span>VENCIMENTO</span><strong>${fmtDate(c.deadline_date)}</strong></div><div class="detail"><span>Nº OFÍCIO / DOCUMENTO</span><strong>${escapeHtml(c.office_number||'—')}</strong></div><div class="detail"><span>DATA OFÍCIO</span><strong>${fmtDate(c.office_date)}</strong></div>${keyBlock}<div class="detail"><span>TIPO DE PRAZO</span><strong>${c.deadline_mode==='business'?'Dias úteis':c.deadline_mode==='calendar'?'Dias corridos':'Data manual'}${c.deadline_days!=null?` · ${c.deadline_days} dias`:''}</strong></div></div>${notesBlock}${filesBlock}<div class="dialog-actions split-actions"><div>${adminDelete}</div><div><button class="btn ghost" onclick="document.getElementById('caseDialog').close()">Fechar</button><button class="btn secondary" data-edit-case="${c.id}">Editar registro</button><button class="btn primary" data-${c.status==='done'?'reopen':'complete'}="${c.id}">${c.status==='done'?'Reabrir registro':'Concluir e arquivar'}</button></div></div></div>`;
   $('#caseDialog').showModal();
 }
 
@@ -251,6 +251,8 @@ async function showEditCase(id){
       <label><span>Responsável *</span><select id="editOwnerId">${state.profiles.map(p=>`<option value="${p.id}" ${p.id===c.owner_id?'selected':''}>${escapeHtml(p.full_name)}</option>`).join('')}</select></label>
       <label><span>Prioridade</span><select id="editPriority"><option value="normal" ${c.priority==='normal'?'selected':''}>Normal</option><option value="high" ${c.priority==='high'?'selected':''}>Alta</option><option value="urgent" ${c.priority==='urgent'?'selected':''}>Urgente</option></select></label>
       <label class="full"><span>Chave do processo / Chave eproc</span><input id="editAccessKey" value="${escapeHtml(c.access_key||'')}" placeholder="Opcional"></label>
+      <label><span>Nº Ofício / Despacho / Sentença</span><input id="editOfficeNumber" value="${escapeHtml(c.office_number||'')}" placeholder="Opcional"></label>
+      <label><span>Data do Ofício / documento</span><input id="editOfficeDate" type="date" value="${c.office_date||''}"></label>
       <label><span>Data de recebimento *</span><input id="editReceivedDate" type="date" required value="${c.received_date}"></label>
       <label><span>Modo do prazo</span><select id="editDeadlineMode"><option value="business" ${c.deadline_mode==='business'?'selected':''}>Dias úteis</option><option value="calendar" ${c.deadline_mode==='calendar'?'selected':''}>Dias corridos</option><option value="manual" ${c.deadline_mode==='manual'?'selected':''}>Data manual</option></select></label>
       <label id="editDaysField"><span>Quantidade de dias *</span><input id="editDeadlineDays" type="number" min="0" value="${c.deadline_days??15}"></label>
@@ -272,7 +274,7 @@ async function showEditCase(id){
 async function saveEditedCase(e){
   e.preventDefault();const id=e.currentTarget.dataset.caseId;const c=state.cases.find(x=>x.id===id);if(!c)return;
   const deadline=editDeadlinePreview();if(!deadline)return toast('Informe um prazo válido.');
-  const patch={process_number:$('#editProcessNumber').value.trim(),case_name:$('#editCaseName').value.trim(),subject:$('#editSubject').value.trim(),access_key:$('#editAccessKey').value.trim()||null,owner_id:$('#editOwnerId').value,priority:$('#editPriority').value,received_date:$('#editReceivedDate').value,deadline_date:deadline,deadline_mode:$('#editDeadlineMode').value,deadline_days:$('#editDeadlineMode').value==='manual'?null:Number($('#editDeadlineDays').value),notes:$('#editNotes').value.trim()};
+  const patch={process_number:$('#editProcessNumber').value.trim(),case_name:$('#editCaseName').value.trim(),subject:$('#editSubject').value.trim(),access_key:$('#editAccessKey').value.trim()||null,office_number:$('#editOfficeNumber').value.trim()||null,office_date:$('#editOfficeDate').value||null,owner_id:$('#editOwnerId').value,priority:$('#editPriority').value,received_date:$('#editReceivedDate').value,deadline_date:deadline,deadline_mode:$('#editDeadlineMode').value,deadline_days:$('#editDeadlineMode').value==='manual'?null:Number($('#editDeadlineDays').value),notes:$('#editNotes').value.trim()};
   if(configured){
     const {error}=await sb.from('cases').update(patch).eq('id',id);if(error)return toast('Não foi possível editar: '+error.message);
     const files=[...($('#editFilesInput')?.files||[])];
@@ -292,6 +294,31 @@ async function deleteCase(id){
     const {error}=await sb.from('cases').delete().eq('id',id);if(error)return toast('Não foi possível excluir: '+error.message);await loadRemote();
   }else{state.cases=state.cases.filter(x=>x.id!==id);saveDemo();}
   $('#caseDialog').close();renderAll();toast('Registro excluído.');
+}
+
+function exportArchiveSpreadsheet(){
+  const archived=state.cases.filter(c=>c.status==='done').sort((a,b)=>(a.completed_at||'').localeCompare(b.completed_at||''));
+  if(!archived.length)return toast('Não há registros arquivados para exportar.');
+  if(!window.XLSX)return toast('Não foi possível carregar o gerador de planilhas.');
+
+  const rows=[
+    ['nº Ofício','nº inquérito / proc','Data Ofício','Recebido','em Assunto','Prazo'],
+    ...archived.map(c=>[
+      c.office_number||'',
+      c.process_number||'',
+      c.office_date?fmtDate(c.office_date):'',
+      c.received_date?fmtDate(c.received_date):'',
+      c.subject||'',
+      c.deadline_date?fmtDate(c.deadline_date):''
+    ])
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:24},{wch:30},{wch:14},{wch:14},{wch:42},{wch:14}];
+  ws['!autofilter']={ref:`A1:F${rows.length}`};
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Arquivados');
+  XLSX.writeFile(wb,`arquivo-arquivados-${todayISO()}.xlsx`);
+  toast('Planilha exportada.');
 }
 
 async function downloadFile(fileId){
@@ -336,6 +363,7 @@ function bindEvents(){
   $$('.table-search').forEach(i=>i.addEventListener('input',()=>{state.searches[i.dataset.target]=i.value;renderTables()}));
   $('#globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){state.searches.all=e.target.value;switchView('allDeadlines');renderTables()}});
   $('#closeDialog').addEventListener('click',()=>$('#caseDialog').close());
+  $('#exportArchiveBtn')?.addEventListener('click',exportArchiveSpreadsheet);
 }
 
 init();

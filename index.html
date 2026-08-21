@@ -175,6 +175,8 @@
               <label><span>Responsável *</span><select id="ownerId" required></select></label>
               <label><span>Prioridade</span><select id="priority"><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label>
               <label class="full"><span>Chave do processo / Chave eproc</span><input id="caseAccessKey" placeholder="Opcional · ex.: chave para consulta no eproc" /><small class="field-note">Informação interna do processo, visível aos usuários autenticados do setor.</small></label>
+              <label><span>Nº Ofício / Despacho / Sentença</span><input id="officeNumber" placeholder="Ex.: Ofício 123/2026-MP, Despacho ou Sentença" /></label>
+              <label><span>Data do Ofício / documento</span><input id="officeDate" type="date" /></label>
             </div>
           </section>
 
@@ -206,7 +208,10 @@
       <section id="view-archive" class="view">
         <div class="toolbar">
           <div><p class="muted">Registros concluídos permanecem pesquisáveis e preservam o histórico.</p></div>
-          <div class="search-box"><span>⌕</span><input class="table-search" data-target="archive" type="search" placeholder="Pesquisar no arquivo..." /></div>
+          <div class="archive-tools">
+            <button id="exportArchiveBtn" class="btn secondary" type="button">Exportar planilha</button>
+            <div class="search-box"><span>⌕</span><input class="table-search" data-target="archive" type="search" placeholder="Pesquisar no arquivo..." /></div>
+          </div>
         </div>
         <div class="table-card"><div id="archiveTable"></div></div>
       </section>
@@ -234,6 +239,7 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
